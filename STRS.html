@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票交易記錄系統</title>
+    <!-- 引入截圖所需的html2canvas庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        /* 			  === 【版權宣言】 ===
+            @ 程式開發者：富途 - 發哥 【免費指標王】
+            @ 發哥免費指標王的個人主頁 - 牛牛圈 
+                    https://q.futunn.com/hk/profile/27543329/
+            @ 【發哥免費指標王】港美股票交流討論頻道，分享更多免費指標： 
+                    https://snsim.futunn.com/share/server/j84D5?lang=zh-hk
+            @ 授權任何個人可以免費使用、分發、修改和分享。
+            @ 但是，必須保留程式中的全部【版權宣言】（包括頂端和底部的位置）。不得作出任何刪除或者修改。
+        */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            padding: 20px;
+            line-height: 1.6;
+            background-color: #f9f9f9;
+            font-size: 16px;
+        }
+        .outer-wrapper {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+        }
+        .calc-section, .stat-section, .record-section, .month-section, .instruction-section {
+            margin: 15px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        /* 錯誤提示DIV樣式 - 實時輸入提示 */
+        .error-tip {
+            width: 100%;
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            background-color: #fee2e2;
+            color: #dc2626;
+            font-size: 14px;
+            display: none;
+        }
+        .error-tip.show {
+            display: block;
+        }
+        /* 實時輸入小提示 - 跟隨輸入框 */
+        .input-tip {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 2px;
+            padding: 4px 8px;
+            background-color: #dc2626;
+            color: #fff;
+            font-size: 12px;
+            border-radius: 4px;
+            z-index: 999;
+            display: none;
+            white-space: nowrap;
+        }
+        .input-group {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 15px;
+            margin-bottom: 15px;
+            flex-wrap: nowrap;
+            position: relative;
+        }
+        .input-group label {
+            margin-right: 8px;
+            font-weight: 600;
+            min-width: 90px;
+        }
+        .input-group input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 140px;
+            font-size: 14px;
+        }
+        /* 日期輸入框樣式 */
+        .date-input {
+            cursor: pointer;
+        }
+        .date-input:hover {
+            border-color: #3B82F6;
+        }
+        /* 可視化日曆模塊樣式 - 強制7列排版 */
+        .calendar {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 5px;
+            width: 280px;
+            background-color: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 10px;
+            z-index: 9999;
+            display: none;
+        }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .calendar-btn {
+            width: 30px;
+            height: 30px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            color: #3B82F6;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .calendar-month {
+            font-weight: 600;
+            color: #111827;
+        }
+        .calendar-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .calendar-table th {
+            font-size: 12px;
+            color: #6b7280;
+            padding: 5px;
+            text-align: center;
+            width: 14.28%; /* 強制7列均分排版 */
+        }
+        .calendar-table td {
+            padding: 5px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 14.28%; /* 強制7列均分 */
+        }
+        .calendar-table td:hover {
+            background-color: #eff6ff;
+        }
+        .calendar-table td.today {
+            background-color: #3B82F6;
+            color: #fff;
+        }
+        .calendar-table td.selected {
+            background-color: #2563eb;
+            color: #fff;
+        }
+        .calendar-table td.other {
+            color: #d1d5db;
+            cursor: not-allowed;
+        }
+        .calendar-table td.future {
+            color: #d1d5db;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        /* 按鈕樣式 + 懸浮提示 */
+        button {
+            padding: 8px 20px;
+            color: white;
+            border: none;
+            border-radius: 9999px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 8px;
+            transition: background-color 0.2s ease;
+            position: relative;
+            user-select: none;
+        }
+        /* 按鈕懸浮提示框 */
+        .btn-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 5px;
+            padding: 4px 8px;
+            background-color: #1f2937;
+            color: #fff;
+            font-size: 12px;
+            border-radius: 4px;
+            white-space: nowrap;
+            z-index: 999;
+            display: none;
+        }
+        .btn-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 5px;
+            border-style: solid;
+            border-color: #1f2937 transparent transparent transparent;
+        }
+        button:hover .btn-tooltip {
+            display: block;
+        }
+        .icon-btn {
+            width: 46px;
+            height: 46px;
+            padding: 0;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 37px;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .profit {
+            color: green;
+            font-weight: bold;
+        }
+        .loss {
+            color: red;
+            font-weight: bold;
+        }
+        .neutral {
+            color: #666;
+            font-weight: bold;
+        }
+        .section-title {
+            font-size: 18px;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #056d03 !important;
+        }
+        .invalid-input {
+            border: 1px solid red !important;
+        }
+        .font-bold {
+            font-weight: 700;
+        }
+        .header-main-title {
+            color: #3B82F6 !important;
+            font-weight: 700 !important;
+        }
+        .text-gray-600 {
+            color: #4b5563 !important;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .mb-2 {
+            margin-bottom: 0.5rem;
+        }
+        .mb-8 {
+            margin-bottom: 2rem;
+        }
+        .header-link {
+            text-decoration: none !important;
+        }
+        .record-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        .record-table th, .record-table td {
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+        .record-table th {
+            background-color: #f8f9fa;
+        }
+        /* 盈虧列專用樣式 */
+        .profit-loss-col {
+            min-width: 120px;
+        }
+        .op-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            margin: 0 2px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .month-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #04a202 !important;
+        }
+        .empty-tip {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+        /* 導入導出隱藏上傳按鈕 */
+        #importFile {
+            display: none;
+        }
+        /* 標題和錯誤提示同行樣式 */
+        .title-tip-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        .title-tip-wrap .section-title {
+            margin-bottom: 0;
+        }
+        .title-tip-wrap .error-tip {
+            margin: 0;
+            flex: 1;
+            margin-left: 20px;
+        }
+        @media (max-width: 768px) {
+            .input-group {
+                display: flex;
+                width: 100%;
+                margin-right: 0;
+            }
+            .record-table {
+                font-size: 12px;
+            }
+            .op-btn {
+                padding: 2px 4px;
+                display: block;
+                margin: 2px auto;
+            }
+            .calendar {
+                width: 100%;
+            }
+            .icon-btn {
+                margin-bottom: 10px;
+            }
+        }
+		.avg-input-group {
+			display: inline-flex;
+			align-items: center;
+			margin-right: 15px;
+			margin-bottom: 15px;
+			flex-wrap: nowrap;
+			position: relative;
+		}
+		.avg-input-group label {
+			margin-right: 8px;
+			font-weight: 600;
+			min-width: 70px;
+		}
+		.avg-input-group input {
+			padding: 8px;
+			border: 1px solid #ccc;
+			border-radius: 4px;
+			width: 120px;
+			font-size: 14px;
+		}
+		.avg-tip {
+			position: absolute;
+			top: 100%;
+			left: 0;
+			margin-top: 2px;
+			padding: 4px 8px;
+			background-color: #dc2626;
+			color: #fff;
+			font-size: 12px;
+			border-radius: 4px;
+			z-index: 999;
+			display: none;
+			white-space: nowrap;
+			width: 100%;
+			box-sizing: border-box;
+		}
+		.avg-global-tip {
+            padding: 8px 12px;
+            background-color: #dc2626;
+            color: #fff;
+            font-size: 12px;
+            border-radius: 4px;
+            margin: 5px 0;
+            display: none;
+        }
+        .avg-global-tip.show {
+            display: block;
+        }
+        .avg-result {
+            margin: 10px 0;
+            padding: 10px 15px;
+            border-radius: 6px;
+            background-color: #e8f4f8;
+            color: #0277bd;
+            font-size: 16px;
+            font-weight: 600;
+            display: none;
+        }
+        .avg-result.show {
+            display: block;
+        }
+        .avg-invalid {
+            border: 1px solid red !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- 外層容器（同時作為截圖目標） -->
+    <div class="outer-wrapper" id="outerWrapper" id="screenshotTarget">
+        <!-- 頁面標題 -->
+        <header class="text-center mb-8">
+            <h1 style="font-size: 2.0rem !important;" class="header-main-title mb-2">股票交易記錄系統</h1>
+            <p class="text-gray-600">
+                <a href='https://snsim.futunn.com/share/server/j84D5?lang=zh-hk' target='_blank' class="header-link">
+                    由 富途 【發哥免費指標王】 編寫免費分享
+                </a>
+            </p>
+        </header>
+        <!-- 輸入表單區 -->
+        <div id="inputDiv" class="calc-section">
+            <!-- 標題和錯誤提示同行容器 -->
+            <div class="title-tip-wrap">
+                <div class="section-title">📝 交易記錄輸入</div>
+                <!-- 全局錯誤提示 -->
+                <div class="error-tip" id="errorTip"></div>
+            </div>
+            <input type="hidden" id="editId" value="">
+            <!-- 隱藏導入文件輸入框 -->
+            <input type="file" id="importFile" accept=".json" onchange="handleFileImport(this)">
+            
+            <!-- 買入日期 -->
+            <div class="input-group">
+                <label for="buyDate">買入日期：</label>
+                <input type="text" id="buyDate" class="date-input" placeholder="DDMMYYYY" maxlength="8" required>
+                <div class="input-tip" id="buyDateTip">僅允許輸入8位數字（DDMMYYYY），不可為未來日期</div>
+                <!-- 可視化日曆模塊 -->
+                <div class="calendar" id="buyCalendar"></div>
+            </div>
+            
+            <!-- 股票號碼 -->
+            <div class="input-group">
+                <label for="stockCode">股票號碼：</label>
+                <input type="text" id="stockCode" placeholder="最大6位字符" maxlength="6" required>
+                <div class="input-tip" id="stockCodeTip">僅允許輸入 字母/數字/點（1-6位）</div>
+            </div>
+            
+            <!-- 股票名稱 -->
+            <div class="input-group">
+                <label for="stockName">股票名稱：</label>
+                <input type="text" id="stockName" placeholder="最大10位字符" maxlength="10" required>
+                <div class="input-tip" id="stockNameTip">僅允許輸入 中英文/數字（1-10位）</div>
+            </div>
+            
+            <!-- 數量 -->
+            <div class="input-group">
+                <label for="quantity">數量：</label>
+                <input type="text" id="quantity" placeholder="最大10位整數" maxlength="10" required>
+                <div class="input-tip" id="quantityTip">僅允許輸入 數字（1-10位）</div>
+            </div>
+            
+            <!-- 買入價 -->
+            <div class="input-group">
+                <label for="buyPrice">買入價：</label>
+                <input type="text" id="buyPrice" placeholder="最大8位/精確3位小數" maxlength="8" required>
+                <div class="input-tip" id="buyPriceTip">僅允許 整數或小數（精確3位）</div>
+            </div>
+            
+            <!-- 賣出價 -->
+            <div class="input-group">
+                <label for="sellPrice">賣出價：</label>
+                <input type="text" id="sellPrice" placeholder="可稍後輸入/最大8位/小數精確3位" maxlength="8">
+                <div class="input-tip" id="sellPriceTip">僅允許 整數或小數（精確3位）</div>
+            </div>
+            
+            <!-- 賣出日期 - 綁定賣出價校驗事件 -->
+            <div class="input-group">
+                <label for="sellDate">賣出日期：</label>
+                <input type="text" id="sellDate" class="date-input" placeholder="可稍後輸入/DDMMYYYY" maxlength="8" oninput="checkDateOrder()" oninput="checkSellDateRequireSellPrice()" onblur="checkSellDateRequireSellPrice()">
+                <div class="input-tip" id="sellDateTip">僅允許輸入8位數字（DDMMYYYY），不可早於【買入日期】，且不可為未來日期</div>
+                <div class="input-tip" id="sellDateTip2">輸入【賣出日期】後，必須輸入【賣出價】</div>
+                <!-- 可視化日曆模塊 -->
+                <div class="calendar" id="sellCalendar"></div>
+            </div>
+            
+            <br>
+			<div class="title-tip-wrap">
+				<!-- 功能按鈕 + 懸浮提示 -->
+				<button id="saveBtn" class="icon-btn" onclick="saveCurrentRecord()">
+					💾<span class="btn-tooltip">保存/修改交易記錄</span>
+				</button>
+				<button id="exportBtn" class="icon-btn" onclick="exportRecords()">
+					📤<span class="btn-tooltip">導出記錄為JSON文件</span>
+				</button>
+				<button id="importBtn" class="icon-btn" onclick="document.getElementById('importFile').click()">
+					📥<span class="btn-tooltip">導入JSON記錄文件（相同ID的現有記錄，將會被覆蓋！）</span>
+				</button>
+				<button id="colorPickerBtn" class="icon-btn" onclick="initRandomColors();initBtnColors();">
+					🎨<span class="btn-tooltip">隨機更換頁面背景顏色</span>
+				</button>
+				<button id="fontIncreaseBtn" class="icon-btn" onclick="fontIncrease()">
+					🔼<span class="btn-tooltip">增大頁面字體大小</span>
+				</button>
+				<button id="fontDecreaseBtn" class="icon-btn" onclick="fontDecrease()">
+					🔽<span class="btn-tooltip">減小頁面字體大小</span>
+				</button>
+				<button id="clearAllBtn" class="icon-btn" onclick="clearAllRecords()">
+					🗑️<span class="btn-tooltip">清空所有交易記錄（需驗證）</span>
+				</button>	<!-- 截圖按鈕 -->
+				<button id="screenshotBtn" class="icon-btn" onclick="takeScreenshot()">
+					📷<span class="btn-tooltip">截圖保存交易記錄頁面</span>
+				</button>			
+				<div style='font-size:38px;color:white;font-weight:400;display:flex;justify-content:center;align-items:center;'>
+					<button id='clockButton' style='border-radius: 50px;border: 2px solid white;background: #333;padding: 8px 20px;cursor: pointer;outline: none;-webkit-tap-highlight-color: transparent;display: flex;justify-content: center;align-items: center;'>
+						<div id="clock" style='font-size:38px;color:white;font-weight:400;display:flex;justify-content:center;align-items:center; '></div>
+					</button> 
+				</div>    
+			</div>			
+        </div>
+        <!-- 總盈虧統計區 -->
+        <div id="totalStatDiv" class="stat-section">
+            <div class="section-title">📊 總盈虧統計</div>
+            <div id="totalStatResult" class="neutral">暫無已賣出交易記錄</div>
+        </div>
+        <!-- 交易記錄展示區 -->
+        <div id="recordListDiv" class="record-section">
+            <div class="section-title">📈 交易記錄（按月分組·賣出日期倒序）📉</div>
+            <div id="recordContent" class="empty-tip">請添加首條交易記錄</div>
+        </div>
+        <!-- 新增：使用說明DIV -->
+        <div id="instructionDiv" class="instruction-section">
+            <div class="section-title">📖 使用說明</div>
+            <p>1. 本程式源代碼公開，所有資料儲存在用戶端設備的瀏覽器上，可離線使用，安全可靠。 </p>
+            <p>2. 相同股票分批買賣，可按【複製】然後修改資料。 建議最好用【計算平均價】工具整合為一條記錄。</p>
+            <p>3. 沒有【賣出日期】視為【持倉中】，可定期用【收市價】去修改【賣出價】，以計算【總盈虧統計】。</p>
+            <p>4. 同一股票只賣出部分，先按【複製】，變成二條記錄再修改資料，其中一條不輸入【賣出日期】視為仍持倉。</p>
+            <p>5. 本程式是利用Cookie進階版【localStorage】去儲存資料，如果關閉瀏覽器後自動清除，請不要啟動以下：</p>
+            <p>E. 電腦版本Edge： 右上角3個點/設定/隱私權、搜尋與服務/關閉時清除瀏覽資料/Cookie 與其他網站資料</p>
+            <p>C. 電腦版本Chrome： 除非用戶手動清除，否則沒有【關閉時清除瀏覽資料】功能。</p>
+            <p>6. 輸入資料後可定期【導出】全部記錄以作備份。 【導入】時自動覆蓋現有（相同記錄ID）的記錄。</p>
+        </div>
+		
+		<!-- 計算平均價區 -->
+        <div id="avgPriceDiv" class="instruction-section">
+            <div class="section-title">🧮 計算平均價</div>   
+    		<!-- 全局提示框（用於至少2行提示） -->
+    		<div class="avg-global-tip" id="avgGlobalTip">請至少填寫2行有效交易數據（價+量均需填寫且格式正確）</div>
+    		<!-- 交易1 -->
+   		 <div class="avg-input-group">
+     		   <label>交易1 價：</label>
+       		 <input type="text" id="avgPrice1" placeholder="精確3位小數" maxlength="8">
+       		 <div class="avg-tip" id="avgPrice1Tip">僅允許整數或小數，精確3位</div>
+  		  </div>
+  		  <div class="avg-input-group">
+    		    <label>交易1 量：</label>
+      		  		<input type="text" id="avgQty1" placeholder="最大10位正整數" maxlength="10">
+    		    <div class="avg-tip" id="avgQty1Tip">僅允許1-10位正整數，不可為0</div>
+  		  </div>
+  		  <br>
+  		  <!-- 交易2 -->
+   		 <div class="avg-input-group">
+    		    <label>交易2 價：</label>
+    		    <input type="text" id="avgPrice2" placeholder="精確3位小數" maxlength="8">
+    		    <div class="avg-tip" id="avgPrice2Tip">僅允許整數或小數，精確3位</div>
+  		  </div>
+  		  <div class="avg-input-group">
+   		     <label>交易2 量：</label>
+    		    <input type="text" id="avgQty2" placeholder="最大10位正整數" maxlength="10">
+     		   <div class="avg-tip" id="avgQty2Tip">僅允許1-10位正整數，不可為0</div>
+   		 </div>
+  		  <br>
+  		  <!-- 交易3 -->
+  		  <div class="avg-input-group">
+    		    <label>交易3 價：</label>
+    		    <input type="text" id="avgPrice3" placeholder="精確3位小數" maxlength="8">
+   		     <div class="avg-tip" id="avgPrice3Tip">僅允許整數或小數，精確3位</div>
+   		 </div>
+  		  <div class="avg-input-group">
+     		   <label>交易3 量：</label>
+     		   <input type="text" id="avgQty3" placeholder="最大10位正整數" maxlength="10">
+     		   <div class="avg-tip" id="avgQty3Tip">僅允許1-10位正整數，不可為0</div>
+  		  </div>
+  		  <br>
+  		  <!-- 交易4 -->
+  		  <div class="avg-input-group">
+   		     <label>交易4 價：</label>
+    		    <input type="text" id="avgPrice4" placeholder="精確3位小數" maxlength="8">
+     		   <div class="avg-tip" id="avgPrice4Tip">僅允許整數或小數，精確3位</div>
+   		 </div>
+   		 <div class="avg-input-group">
+      		  <label>交易4 量：</label>
+       		 <input type="text" id="avgQty4" placeholder="最大10位正整數" maxlength="10">
+      		  <div class="avg-tip" id="avgQty4Tip">僅允許1-10位正整數，不可為0</div>
+   		 </div>
+   		 <br>
+   		 <!-- 計算按鈕 -->
+   		 <button style="background-color: #758b09; border-radius: 9999px;" onclick="calcAvgPrice()">
+    		    計算平均價
+    		</button>
+   		 <button style="background-color: #057fb3; border-radius: 9999px;" onclick="resetAvgPrice()">
+    		    重置
+   		 </button>
+   		 <!-- 計算結果 -->
+		<div class="avg-result" id="avgResult"></div>
+		<script>
+		/************************** 平均價計算相關函數 **************************/
+			// 價格輸入限制
+		function bindAvgPriceRestrict(inputId, tipId) {
+			const input = document.getElementById(inputId);
+			const tip = document.getElementById(tipId);
+			if (!input || !tip) return;
+				// 鍵盤輸入限制
+			input.addEventListener('keypress', (e) => {
+				if (!/^\d$/.test(e.key) && e.key !== '.') {
+					e.preventDefault();
+					input.classList.add('avg-invalid');
+					tip.style.display = 'block';
+					setTimeout(() => { tip.style.display = 'none'; input.classList.remove('avg-invalid'); }, 3000);
+				}
+				if (e.key === '.' && input.value.includes('.')) {
+					e.preventDefault();
+					input.classList.add('avg-invalid');
+					tip.style.display = 'block';
+					setTimeout(() => { tip.style.display = 'none'; input.classList.remove('avg-invalid'); }, 3000);
+				}
+			});
+				// 實時格式化與過濾
+			input.addEventListener('input', () => {
+				let val = input.value.replace(/[^0-9.]/g, '');
+				if (val.split('.').length > 2) val = val.substring(0, val.lastIndexOf('.'));
+				if (val.includes('.')) {
+					const [int, dec] = val.split('.');
+					val = dec.length > 3 ? `${int}.${dec.substring(0,3)}` : val;
+				}
+				input.value = val;
+				input.classList.remove('avg-invalid');
+				tip.style.display = 'none';
+				hideAvgGlobalTip(); // 輸入時隱藏全局提示
+			});
+				// 失焦隱藏提示
+			input.addEventListener('blur', () => {
+				tip.style.display = 'none';
+				input.classList.remove('avg-invalid');
+			});
+		}
+			// 數量輸入限制（與原頁面數量完全一致）
+        function bindAvgQtyRestrict(inputId, tipId) {
+            const input = document.getElementById(inputId);
+            const tip = document.getElementById(tipId);
+            if (!input || !tip) return;
+            // 鍵盤輸入限制
+            input.addEventListener('keypress', (e) => {
+                if (!/^\d$/.test(e.key)) {
+                    e.preventDefault();
+                    input.classList.add('avg-invalid');
+                    tip.style.display = 'block';
+                    setTimeout(() => { tip.style.display = 'none'; input.classList.remove('avg-invalid'); }, 3000);
+                }
+            });
+            // 實時格式化與過濾
+            input.addEventListener('input', () => {
+                input.value = input.value.replace(/\D/g, '').replace(/^0+/, '');
+                input.classList.remove('avg-invalid');
+                tip.style.display = 'none';
+                hideAvgGlobalTip(); // 輸入時隱藏全局提示
+            });
+            // 失焦隱藏提示
+            input.addEventListener('blur', () => {
+                tip.style.display = 'none';
+                input.classList.remove('avg-invalid');
+            });
+        }
+
+			// 顯示全局提示
+        function showAvgGlobalTip() {
+            const tip = document.getElementById('avgGlobalTip');
+            if (tip) tip.classList.add('show');
+            setTimeout(hideAvgGlobalTip, 3000);
+        }
+
+			// 隱藏全局提示
+        function hideAvgGlobalTip() {
+            const tip = document.getElementById('avgGlobalTip');
+            if (tip) tip.classList.remove('show');
+        }
+
+			// 初始化平均價輸入限制
+        function initAvgInputRestrict() {
+            // 綁定價格限制
+            bindAvgPriceRestrict('avgPrice1', 'avgPrice1Tip');
+            bindAvgPriceRestrict('avgPrice2', 'avgPrice2Tip');
+            bindAvgPriceRestrict('avgPrice3', 'avgPrice3Tip');
+            bindAvgPriceRestrict('avgPrice4', 'avgPrice4Tip');
+            // 綁定數量限制
+            bindAvgQtyRestrict('avgQty1', 'avgQty1Tip');
+            bindAvgQtyRestrict('avgQty2', 'avgQty2Tip');
+            bindAvgQtyRestrict('avgQty3', 'avgQty3Tip');
+            bindAvgQtyRestrict('avgQty4', 'avgQty4Tip');
+        }
+
+			// 校驗單行輸入：填一個必填另一個，都填則校驗格式
+        function checkAvgRow(priceId, qtyId, priceTipId, qtyTipId) {
+            const priceInput = document.getElementById(priceId);
+            const qtyInput = document.getElementById(qtyId);
+            const priceTip = document.getElementById(priceTipId);
+            const qtyTip = document.getElementById(qtyTipId);
+            const priceVal = priceInput.value.trim();
+            const qtyVal = qtyInput.value.trim();
+
+            // 一填一空 → 校驗失敗
+            if ((priceVal && !qtyVal) || (!priceVal && qtyVal)) {
+                if (!priceVal) {
+                    priceInput.classList.add('avg-invalid');
+                    priceTip.innerText = '填寫數量後，必須填寫價格';
+                    priceTip.style.display = 'block';
+                    setTimeout(() => { priceTip.style.display = 'none'; priceInput.classList.remove('avg-invalid'); }, 3000);
+                }
+                if (!qtyVal) {
+                    qtyInput.classList.add('avg-invalid');
+                    qtyTip.innerText = '填寫價格後，必須填寫數量';
+                    qtyTip.style.display = 'block';
+                    setTimeout(() => { qtyTip.style.display = 'none'; qtyInput.classList.remove('avg-invalid'); }, 3000);
+                }
+                return false;
+            }
+            // 都填 → 校驗格式有效性
+            if (priceVal && qtyVal) {
+                const priceReg = /^[0-9]+(\.[0-9]{1,3})?$/; // 價格規則
+                const qtyReg = /^[1-9]\d{0,9}$/; // 數量規則
+                let isOk = true;
+                if (!priceReg.test(priceVal)) {
+                    priceInput.classList.add('avg-invalid');
+                    priceTip.style.display = 'block';
+                    setTimeout(() => { priceTip.style.display = 'none'; priceInput.classList.remove('avg-invalid'); }, 3000);
+                    isOk = false;
+                }
+                if (!qtyReg.test(qtyVal)) {
+                    qtyInput.classList.add('avg-invalid');
+                    qtyTip.style.display = 'block';
+                    setTimeout(() => { qtyTip.style.display = 'none'; qtyInput.classList.remove('avg-invalid'); }, 3000);
+                    isOk = false;
+                }
+                return isOk;
+            }
+            // 都空 → 校驗通過
+            return true;
+        }
+
+			// 統計有效行數：返回價+量都填且格式正確的行數
+        function getValidRowCount() {
+            let count = 0;
+            // 校驗4行並統計有效行
+            const row1Valid = checkAvgRow('avgPrice1', 'avgQty1', 'avgPrice1Tip', 'avgQty1Tip');
+            const row2Valid = checkAvgRow('avgPrice2', 'avgQty2', 'avgPrice2Tip', 'avgQty2Tip');
+            const row3Valid = checkAvgRow('avgPrice3', 'avgQty3', 'avgPrice3Tip', 'avgQty3Tip');
+            const row4Valid = checkAvgRow('avgPrice4', 'avgQty4', 'avgPrice4Tip', 'avgQty4Tip');
+
+            // 判斷每行是否有填寫值且校驗通過
+            if (document.getElementById('avgPrice1').value.trim() && document.getElementById('avgQty1').value.trim() && row1Valid) count++;
+            if (document.getElementById('avgPrice2').value.trim() && document.getElementById('avgQty2').value.trim() && row2Valid) count++;
+            if (document.getElementById('avgPrice3').value.trim() && document.getElementById('avgQty3').value.trim() && row3Valid) count++;
+            if (document.getElementById('avgPrice4').value.trim() && document.getElementById('avgQty4').value.trim() && row4Valid) count++;
+
+            return count;
+        }
+
+			// 整體校驗輸入規則
+        function validateAvgInput() {
+            const validCount = getValidRowCount();
+            // 校驗1：至少2行有效數據
+            if (validCount < 2) {
+                showAvgGlobalTip();
+                return false;
+            }
+            // 校驗2：所有填寫的行單行校驗都通過
+            return checkAvgRow('avgPrice1', 'avgQty1', 'avgPrice1Tip', 'avgQty1Tip') &&
+                   checkAvgRow('avgPrice2', 'avgQty2', 'avgPrice2Tip', 'avgQty2Tip') &&
+                   checkAvgRow('avgPrice3', 'avgQty3', 'avgPrice3Tip', 'avgQty3Tip') &&
+                   checkAvgRow('avgPrice4', 'avgQty4', 'avgPrice4Tip', 'avgQty4Tip');
+        }
+
+			// 計算平均價核心邏輯：平均價 (總金額/總數量)
+        function calcAvgPrice() {
+            // 先隱藏結果和全局提示，避免殘留
+            document.getElementById('avgResult').classList.remove('show');
+            hideAvgGlobalTip();
+            // 整體校驗輸入，不通過則直接返回
+            if (!validateAvgInput()) return;
+
+            let totalAmount = 0; // 總投入金額
+            let totalQty = 0;    // 總持股數量
+            let validCount = 0;  // 有效行數
+
+				// 遍歷4行交易，累加有效數據
+            for (let i = 1; i <= 4; i++) {
+                const priceVal = document.getElementById(`avgPrice${i}`).value.trim();
+                const qtyVal = document.getElementById(`avgQty${i}`).value.trim();
+                if (priceVal && qtyVal) {
+                    const price = parseFloat(priceVal);
+                    const qty = parseInt(qtyVal);
+                    totalAmount += price * qty;
+                    totalQty += qty;
+                    validCount++;
+                }
+            }
+
+				// 避免除零錯誤（保險邏輯）
+            if (totalQty === 0) return;
+            // 計算加權平均價（精確4位小數）
+            const avgPrice = (totalAmount / totalQty).toFixed(4);
+            // 顯示結果
+            const resultDiv = document.getElementById('avgResult');
+            resultDiv.innerText = `平均價：${avgPrice} | 總投入金額：${totalAmount.toFixed(2)} | 總持股數量：${totalQty} | 有效計算行數：${validCount}`;
+            resultDiv.classList.add('show');
+        }
+
+			// 重置平均價輸入框和結果
+        function resetAvgPrice() {
+            // 清空所有輸入框、隱藏提示、移除錯誤樣式
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById(`avgPrice${i}`).value = '';
+                document.getElementById(`avgQty${i}`).value = '';
+                document.getElementById(`avgPrice${i}Tip`).style.display = 'none';
+                document.getElementById(`avgQty${i}Tip`).style.display = 'none';
+                document.getElementById(`avgPrice${i}`).classList.remove('avg-invalid');
+                document.getElementById(`avgQty${i}`).classList.remove('avg-invalid');
+            }
+            // 隱藏全局提示和計算結果
+            hideAvgGlobalTip();
+            document.getElementById('avgResult').classList.remove('show');
+            document.getElementById('avgResult').innerText = '';
+        }
+
+			// 頁面加載時初始化（確保只執行一次）
+        if (!window.avgInputInited) {
+            initAvgInputRestrict();
+            window.avgInputInited = true;
+        }
+    </script>
+</div>
+        <!-- 頁腳信息 -->
+        <footer class="text-center text-gray-500 text-sm mt-12">
+            <p>© 2026 【股票交易記錄系統】 | <a href='https://snsim.futunn.com/share/server/j84D5?lang=zh-hk' target='_blank' class="header-link">由 富途 【發哥免費指標王】 編寫免費分享</a></p>
+        </footer>
+    </div>
+    <script>
+        /************************** 全局變量 **************************/
+        window.currentFontScale = 1;
+        window.fontStep = 0.1;
+        window.minFontScale = 0.8;
+        window.maxFontScale = 2;
+        window.STORAGE_KEY = 'stockTradeRecords';
+        window.errorTip = document.getElementById('errorTip') || null;
+        window.currentCalendar = null;
+        window.selectedDate = new Date();
+        // 今日日期（YYYYMMDD），用於判斷未來日期
+        window.todayYmd = new Date().getFullYear() + String(new Date().getMonth() + 1).padStart(2, '0') + String(new Date().getDate()).padStart(2, '0');
+        /************************** 頁面初始化 **************************/
+        document.addEventListener('DOMContentLoaded', function() {
+            // 前置判空：核心節點不存在則終止，避免報錯
+            if (!window.errorTip || !document.getElementById('buyDate') || !document.getElementById('saveBtn')) {
+                console.error('核心DOM節點缺失，頁面初始化失敗');
+                return;
+            }
+        
+            // 新增：頁面加載時強制清空editId，避免本地存儲殘留
+            document.getElementById('editId').value = '';
+        
+            // 初始化所有功能
+            initRandomColors();
+            initBtnColors();
+            setTodayDate();
+            initCalendar('buyCalendar', 'buyDate');
+            initCalendar('sellCalendar', 'sellDate');
+            bindInputRestrict();
+            bindDateBlurCheck();
+            renderAllRecords();
+            bindEvents();
+            bindClickOutside();
+            bindImportExportEvents();
+            // 初始化字體
+            document.body.style.fontSize = window.currentFontScale + 'rem';
+            // 關鍵修複：移除按鈕重複綁定，解決多次觸發問題
+            const exportBtn = document.getElementById('exportBtn');
+            if (exportBtn) exportBtn.removeEventListener('click', exportRecords);
+            const saveBtn = document.getElementById('saveBtn');
+            if (saveBtn) saveBtn.removeEventListener('click', saveCurrentRecord);
+        });
+        /************************** 補全未定義函數 **************************/
+        function bindImportExportEvents() {}
+        /************************** 字體控制 **************************/
+        function fontIncrease() {
+            window.currentFontScale = Math.min(window.currentFontScale + window.fontStep, window.maxFontScale);
+            document.body.style.fontSize = window.currentFontScale + 'rem';
+        }
+        function fontDecrease() {
+            window.currentFontScale = Math.max(window.currentFontScale - window.fontStep, window.minFontScale);
+            document.body.style.fontSize = window.currentFontScale + 'rem';
+        }
+        /************************** 顏色相關函數 **************************/
+        function getRandomLightColor() {
+            const r = Math.floor(Math.random() * 75) + 180;
+            const g = Math.floor(Math.random() * 75) + 180;
+            const b = Math.floor(Math.random() * 75) + 180;
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+        function getRandomBtnColor() {
+            const r = Math.floor(Math.random() * 120) + 60;
+            const g = Math.floor(Math.random() * 120) + 60;
+            const b = Math.floor(Math.random() * 120) + 60;
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+        function darkenColor(color, amount = 30) {
+            const rgbMatch = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+            if (!rgbMatch) return color;
+            let r = parseInt(rgbMatch[1]) - amount;
+            let g = parseInt(rgbMatch[2]) - amount;
+            let b = parseInt(rgbMatch[3]) - amount;
+            r = r < 0 ? 0 : r;
+            g = g < 0 ? 0 : g;
+            b = b < 0 ? 0 : b;
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+        function initRandomColors() {
+            const outerWrapper = document.getElementById('outerWrapper');
+            const sections = document.querySelectorAll('.calc-section, .stat-section, .record-section, .month-section, .instruction-section');
+            if (outerWrapper) outerWrapper.style.backgroundColor = getRandomLightColor();
+            sections.forEach(div => {
+                if (div) div.style.backgroundColor = getRandomLightColor();
+            });
+        }
+        function initBtnColors() {
+            const buttons = document.querySelectorAll('.icon-btn');
+            buttons.forEach(btn => {
+                if (!btn) return;
+                const originalColor = getRandomBtnColor();
+                const hoverColor = darkenColor(originalColor);
+                btn.style.backgroundColor = originalColor;
+                btn.addEventListener('mouseover', () => btn.style.backgroundColor = hoverColor);
+                btn.addEventListener('mouseout', () => btn.style.backgroundColor = originalColor);
+                btn.dataset.originalColor = originalColor;
+                btn.dataset.hoverColor = hoverColor;
+            });
+        }
+        /************************** 日期相關工具 **************************/
+        function setTodayDate() {
+            const today = new Date();
+            const dd = String(today.getDate()).padStart(2, '0');
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const yyyy = today.getFullYear();
+            const todayStr = dd + mm + yyyy;
+            const buyDate = document.getElementById('buyDate');
+            const sellDate = document.getElementById('sellDate');
+            if (buyDate) buyDate.value = todayStr;
+            if (sellDate) sellDate.value = '';
+        }
+        function isFutureDate(dateStr) {
+            if (!dateStr || dateStr.length !== 8) return false;
+            const ymd = dateStr.slice(4) + dateStr.slice(2,4) + dateStr.slice(0,2);
+            return ymd > window.todayYmd;
+        }
+        /************************** 提示框控制 **************************/
+        function showErrorTip(msg) {
+            if (!window.errorTip) return;
+            window.errorTip.innerText = msg;
+            window.errorTip.classList.add('show');
+            setTimeout(() => hideErrorTip(), 10000);
+        }
+        function hideErrorTip() {
+            if (!window.errorTip) return;
+            window.errorTip.classList.remove('show');
+            window.errorTip.innerText = '';
+            document.querySelectorAll('input').forEach(input => {
+                if (input) input.classList.remove('invalid-input');
+            });
+        }
+        function showInputTip(tipId) {
+            const tip = document.getElementById(tipId);
+            if (tip) {
+                tip.style.display = 'block';
+                showErrorTip(tip.innerText);
+            }
+            setTimeout(() => hideInputTip(tipId), 6000);
+        }
+        function hideInputTip(tipId) {
+            const tip = document.getElementById(tipId);
+            if (tip) tip.style.display = 'none';
+        }
+        function hideAllInputTips() {
+            document.querySelectorAll('.input-tip').forEach(tip => {
+                if (tip) tip.style.display = 'none';
+            });
+        }
+        /************************** 日期輸入框失焦檢查（修復核心） **************************/
+        function bindDateBlurCheck() {
+            ['buyDate', 'sellDate'].forEach(id => {
+                const input = document.getElementById(id);
+                const tipId = `${id}Tip`;
+                if (!input) return;
+                input.addEventListener('blur', function() {
+                    // 新增：跳過日歷選擇的情況，避免重複校驗
+                    if (this.dataset.isCalendarSelect === 'true') {
+                        this.dataset.isCalendarSelect = 'false'; // 重置標記
+                        this.classList.remove('invalid-input');
+                        return;
+                    }
+                    const val = this.value.trim();
+                    const reg = /^\d{8}$/;
+                    if (val && !reg.test(val)) {
+                        this.classList.add('invalid-input');
+                        showInputTip(tipId);
+                        return;
+                    }
+                    if (val && isFutureDate(val)) {
+                        this.classList.add('invalid-input');
+                        showInputTip(tipId);
+                        return;
+                    }
+                    if (id === 'sellDate' && val) {
+                        checkDateOrder();
+                    }
+                    this.classList.remove('invalid-input');
+                });
+            });
+        }
+        /************************** 輸入框實時限制 **************************/
+        function bindInputRestrict() {
+            // 日期輸入：僅8位數字
+            ['buyDate', 'sellDate'].forEach(id => {
+                const input = document.getElementById(id);
+                const tip = document.getElementById(`${id}Tip`);
+                if (!input || !tip) return;
+                input.addEventListener('keypress', (e) => {
+                    // 手動輸入時重置日歷選擇標記
+                    input.dataset.isCalendarSelect = 'false';
+                    if (!/^\d$/.test(e.key)) {
+                        e.preventDefault();
+                        showInputTip(`${id}Tip`);
+                        input.classList.add('invalid-input');
+                    }
+                });
+                input.addEventListener('input', () => {
+                    // 手動輸入時重置日歷選擇標記
+                    input.dataset.isCalendarSelect = 'false';
+                    input.value = input.value.replace(/\D/g, '');
+                    if (input.value) input.classList.remove('invalid-input');
+                });
+            });
+            // 股票號碼：僅字母/數字/點 (美股代碼可含有點)
+            const stockCode = document.getElementById('stockCode');
+            const stockCodeTip = document.getElementById('stockCodeTip');
+            if (stockCode && stockCodeTip) {
+                stockCode.addEventListener('keypress', (e) => {
+                    if (!/^[A-Za-z0-9\.]$/.test(e.key)) {
+                        e.preventDefault();
+                        showInputTip('stockCodeTip');
+                        stockCode.classList.add('invalid-input');
+                    }
+                });
+                stockCode.addEventListener('input', () => {
+                    stockCode.value = stockCode.value.replace(/[^A-Za-z0-9\.]/g, '');
+                    if (stockCode.value) stockCode.classList.remove('invalid-input');
+                });
+            }
+            // 股票名稱：中英文/數字: 輸入中文時，出現異常，自動吃掉前面已經輸入文字，作廢!
+            /*const stockName = document.getElementById('stockName');
+            const stockNameTip = document.getElementById('stockNameTip');
+            if (stockName && stockNameTip) {
+                stockName.addEventListener('keypress', (e) => {
+                    if (!/^[\u4e00-\u9fa5A-Za-z0-9]$/.test(e.key)) {
+                        e.preventDefault();
+                        showInputTip('stockNameTip');
+                        stockName.classList.add('invalid-input');
+                    }
+                });
+                stockName.addEventListener('input', () => {
+                    stockName.value = stockName.value.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, '');
+                    if (stockName.value) stockName.classList.remove('invalid-input');
+                });
+            }*/
+            // 數量：僅正整數
+            const quantity = document.getElementById('quantity');
+            const quantityTip = document.getElementById('quantityTip');
+            if (quantity && quantityTip) {
+                quantity.addEventListener('keypress', (e) => {
+                    if (!/^\d$/.test(e.key)) {
+                        e.preventDefault();
+                        showInputTip('quantityTip');
+                        quantity.classList.add('invalid-input');
+                    }
+                });
+                quantity.addEventListener('input', () => {
+                    quantity.value = quantity.value.replace(/\D/g, '').replace(/^0+/, '');
+                    if (quantity.value) quantity.classList.remove('invalid-input');
+                });
+            }
+            // 價格：數字+一個小數點，精確3位
+            ['buyPrice', 'sellPrice'].forEach(id => {
+                const input = document.getElementById(id);
+                const tip = document.getElementById(`${id}Tip`);
+                if (!input || !tip) return;
+                input.addEventListener('keypress', (e) => {
+                    if (!/^\d$/.test(e.key) && e.key !== '.') {
+                        e.preventDefault();
+                        showInputTip(`${id}Tip`);
+                        input.classList.add('invalid-input');
+                    }
+                    if (e.key === '.' && input.value.includes('.')) {
+                        e.preventDefault();
+                        showInputTip(`${id}Tip`);
+                        input.classList.add('invalid-input');
+                    }
+                });
+                input.addEventListener('input', () => {
+                    let val = input.value.replace(/[^0-9.]/g, '');
+                    if (val.split('.').length > 2) val = val.substring(0, val.lastIndexOf('.'));
+                    if (val.includes('.')) {
+                        const [int, dec] = val.split('.');
+                        val = dec.length > 3 ? `${int}.${dec.substring(0,3)}` : val;
+                    }
+                    input.value = val;
+                    if (input.value) input.classList.remove('invalid-input');
+                });
+            });
+            // 失焦隱藏提示
+            document.querySelectorAll('input').forEach(input => {
+                if (input && !['buyDate','sellDate'].includes(input.id)) {
+                    input.addEventListener('blur', hideAllInputTips);
+                }
+            });
+        }
+        /************************** 日期順序校驗 **************************/
+        function checkDateOrder() {
+            const buyDate = document.getElementById('buyDate');
+            const sellDate = document.getElementById('sellDate');
+            if (!buyDate || !sellDate) return false;
+            const buyVal = buyDate.value.trim();
+            const sellVal = sellDate.value.trim();
+            if (buyVal.length !== 8 || sellVal.length !== 8) {
+                sellDate.classList.remove('invalid-input');
+                return true;
+            }
+            if (isFutureDate(buyVal) || isFutureDate(sellVal)) {
+                sellDate.classList.add('invalid-input');
+                showInputTip('sellDateTip');
+                return false;
+            }
+            const buyYmd = buyVal.slice(4) + buyVal.slice(2,4) + buyVal.slice(0,2);
+            const sellYmd = sellVal.slice(4) + sellVal.slice(2,4) + sellVal.slice(0,2);
+            if (sellYmd < buyYmd) {
+                sellDate.classList.add('invalid-input');
+                showInputTip('sellDateTip');
+                return false;
+            }
+            sellDate.classList.remove('invalid-input');
+            return true;
+        }
+        /************************** 限制：賣出日期必填賣出價 實時校驗 **************************/
+        function checkSellDateRequireSellPrice() {
+            const sellPriceVal = document.getElementById('sellPrice').value.trim();
+            const sellDateVal = document.getElementById('sellDate').value.trim();
+            const sellPriceInput = document.getElementById('sellPrice');
+            const sellDateTip = document.getElementById('sellDateTip2');
+            
+            // 有賣出日期但無賣出價，標紅+提示
+            if (sellDateVal && !sellPriceVal) {
+                sellPriceInput.classList.add('invalid-input');
+                showInputTip('sellDateTip2');
+            } else {
+                sellPriceInput.classList.remove('invalid-input');
+                hideInputTip('sellDateTip2');
+            }
+        }
+        /************************** 日歷相關（修復核心） **************************/
+        function initCalendar(calendarId, inputId) {
+            const calendar = document.getElementById(calendarId);
+            const input = document.getElementById(inputId);
+            if (!calendar || !input) return;
+            window.currentCalendar = calendar;
+            renderCalendar(calendar, window.selectedDate, inputId);
+            input.addEventListener('click', (e) => {
+                e.stopPropagation();
+                hideAllCalendars();
+                calendar.style.display = 'block';
+                if (input.value.length === 8) {
+                    const dd = input.value.slice(0,2);
+                    const mm = input.value.slice(2,4) - 1;
+                    const yyyy = input.value.slice(4,8);
+                    window.selectedDate = new Date(yyyy, mm, dd);
+                    renderCalendar(calendar, window.selectedDate, inputId);
+                }
+            });
+            calendar.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const target = e.target;
+                const year = window.selectedDate.getFullYear();
+                const month = window.selectedDate.getMonth();
+                if (target.closest('.prev-month')) {
+                    window.selectedDate = new Date(year, month - 1, 1);
+                    renderCalendar(calendar, window.selectedDate, inputId);
+                } else if (target.closest('.next-month')) {
+                    window.selectedDate = new Date(year, month + 1, 1);
+                    renderCalendar(calendar, window.selectedDate, inputId);
+                }
+                if (target.tagName === 'TD' && !target.classList.contains('other') && !target.classList.contains('future')) {
+                    const day = parseInt(target.innerText);
+                    const newDate = new Date(year, month, day);
+                    const dd = String(newDate.getDate()).padStart(2, '0');
+                    const mm = String(newDate.getMonth() + 1).padStart(2, '0');
+                    const yyyy = newDate.getFullYear();
+                    // 新增：標記為日歷選擇，避免blur時重複校驗
+                    input.dataset.isCalendarSelect = 'true';
+                    // 清除錯誤樣式和提示
+                    input.classList.remove('invalid-input');
+                    hideErrorTip();
+                    hideAllInputTips();
+                    // 賦值日期
+                    input.value = dd + mm + yyyy;
+                    window.selectedDate = newDate;
+                    renderCalendar(calendar, window.selectedDate, inputId);
+                    if (inputId === 'sellDate') {
+                        checkDateOrder();
+                        checkSellDateRequireSellPrice(); // 選日期後校驗賣出價關聯
+                    }
+                    calendar.style.display = 'none';
+                }
+            });
+        }
+        function renderCalendar(calendar, date, inputId) {
+            if (!calendar || !date) return;
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            const today = new Date();
+            const todayFull = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const prevLastDay = new Date(year, month, 0);
+            const daysInMonth = lastDay.getDate();
+            const prevDays = firstDay.getDay() || 7;
+            const nextDays = 42 - (prevDays + daysInMonth);
+            let calendarHtml = `
+                <div class="calendar-header">
+                    <button class="calendar-btn prev-month">&lt;</button>
+                    <div class="calendar-month">${year}年${month + 1}月</div>
+                    <button class="calendar-btn next-month">&gt;</button>
+                </div>
+                <table class="calendar-table">
+                    <thead><tr><th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th></tr></thead>
+                    <tbody>
+            `;
+            let dayCount = 0;
+            // 上一月
+            for (let i = prevDays - 1; i >= 0; i--) {
+                calendarHtml += `<td class="other">${prevLastDay.getDate() - i}</td>`;
+                dayCount++;
+                if (dayCount % 7 === 0) calendarHtml += `</tr><tr>`;
+            }
+            // 當月
+            for (let i = 1; i <= daysInMonth; i++) {
+                const currentDay = new Date(year, month, i);
+                const isToday = currentDay.getTime() === todayFull.getTime();
+                const isSelected = i === date.getDate() && month === date.getMonth() && year === date.getFullYear();
+                const isFuture = currentDay > todayFull;
+                const clsArr = [];
+                if (isToday) clsArr.push('today');
+                if (isSelected) clsArr.push('selected');
+                if (isFuture) clsArr.push('future');
+                const cls = clsArr.filter(Boolean).join(' ');
+                calendarHtml += `<td ${cls ? `class="${cls}"` : ''}>${i}</td>`;
+                dayCount++;
+                if (dayCount % 7 === 0) calendarHtml += `</tr><tr>`;
+            }
+            // 下一月
+            for (let i = 1; i <= nextDays; i++) {
+                calendarHtml += `<td class="other future">${i}</td>`;
+                dayCount++;
+                if (dayCount % 7 === 0) calendarHtml += `</tr><tr>`;
+            }
+            calendarHtml += `</tr></tbody></table>`;
+            calendar.innerHTML = calendarHtml;
+        }
+        function hideAllCalendars() {
+            document.querySelectorAll('.calendar').forEach(cal => {
+                if (cal) cal.style.display = 'none';
+            });
+        }
+        function bindClickOutside() {
+            document.addEventListener('click', () => {
+                hideAllCalendars();
+                hideAllInputTips();
+            });
+        }
+        /************************** 保存之前檢查輸入：表單驗證函數 **************************/
+        function validateForm() {
+            hideErrorTip();
+            // 強制移除所有輸入框的錯誤樣式，徹底解決殘留誤提示問題
+            document.querySelectorAll('input').forEach(input => {
+                if (input) input.classList.remove('invalid-input');
+            });
+            // 必填表單驗證
+            const required = [
+                {id: 'buyDate', name: '買入日期'},
+                {id: 'stockCode', name: '股票號碼'},
+                {id: 'stockName', name: '股票名稱'},
+                {id: 'quantity', name: '數量'},
+                {id: 'buyPrice', name: '買入價'}
+            ];
+            for (const item of required) {
+                const input = document.getElementById(item.id);
+                if (!input) continue;
+                const val = input.value.trim();
+                // 判斷值是否真的為空，避免空白字符誤判
+                if (!val || val === '') {
+                    input.classList.add('invalid-input');
+                    showErrorTip(`${item.name}為必填項！`);
+                    return false;
+                }
+            }
+            // 獲取所有值（去重空白字符）
+            const buyDate = document.getElementById('buyDate').value.trim();
+            const stockCode = document.getElementById('stockCode').value.trim();
+            const stockName = document.getElementById('stockName').value.trim();
+            const quantity = document.getElementById('quantity').value.trim();
+            const buyPrice = document.getElementById('buyPrice').value.trim();
+            const sellDate = document.getElementById('sellDate').value.trim();
+            const sellPrice = document.getElementById('sellPrice').value.trim();
+            // 驗證規則
+            const regs = {
+                date: /^\d{8}$/,
+                code: /^[A-Za-z0-9\.]{1,6}$/,
+                name: /^[\u4e00-\u9fa5A-Za-z0-9]{1,10}$/,
+                integer: /^[1-9]\d{0,9}$/,
+                price: /^[0-9]+(\.[0-9]{1,3})?$/
+            };
+            // 逐項嚴格驗證
+            if (!regs.date.test(buyDate)) {
+                document.getElementById('buyDate').classList.add('invalid-input');
+                showErrorTip('【買入日期】必須是8位數字（DDMMYYYY）！');
+                return false;
+            }
+            if (isFutureDate(buyDate)) {
+                document.getElementById('buyDate').classList.add('invalid-input');
+                showErrorTip('【買入日期】不可為 未來日期！');
+                return false;
+            }
+            if (!regs.code.test(stockCode)) {
+                document.getElementById('stockCode').classList.add('invalid-input');
+                showErrorTip('【股票號碼】為1-6位字母/數字/點！');	// 允許字母、數字、英文點號，長度1-6位
+                return false;
+            }
+            if (!regs.name.test(stockName)) {
+                document.getElementById('stockName').classList.add('invalid-input');
+                showErrorTip('【股票名稱】為1-10位中英文/數字！');
+                return false;
+            }
+            if (!regs.integer.test(quantity)) {
+                document.getElementById('quantity').classList.add('invalid-input');
+                showErrorTip('【數量】為1-10位正整數！');
+                return false;
+            }
+            if (!regs.price.test(buyPrice) || buyPrice.length > 8) {
+                document.getElementById('buyPrice').classList.add('invalid-input');
+                showErrorTip('【買入價】為數字，精確3位小數且總長≤8！');
+                return false;
+            }
+            // 賣出價有輸入時，強制校驗賣出日期（必填+格式正確+非未來日期+不早於買入日期）
+            if (sellDate && sellDate !== '') {
+                if (!sellPrice || sellPrice === '') {
+                    document.getElementById('sellPrice').classList.add('invalid-input');
+                    showErrorTip('填寫【賣出日期】後，必須輸入【賣出價】！');
+                    return false;
+                }
+                if (!regs.date.test(sellDate)) {
+                    document.getElementById('sellDate').classList.add('invalid-input');
+                    showErrorTip('【賣出日期】必須是8位數字（DDMMYYYY）！');
+                    return false;
+                }
+                if (isFutureDate(sellDate)) {
+                    document.getElementById('sellDate').classList.add('invalid-input');
+                    showErrorTip('【賣出日期】不可為 未來日期！');
+                    return false;
+                }
+                if (!checkDateOrder()) {
+                    return false;
+                }
+            }
+            // 賣出日期有輸入但無賣出價的校驗
+            if (sellDate && sellDate !== '' && (!sellPrice || sellPrice === '')) {
+                if (!regs.date.test(sellDate)) {
+                    document.getElementById('sellDate').classList.add('invalid-input');
+                    showErrorTip('【賣出日期】必須是8位數字（DDMMYYYY）！');
+                    return false;
+                }
+                if (isFutureDate(sellDate)) {
+                    document.getElementById('sellDate').classList.add('invalid-input');
+                    showErrorTip('【賣出日期】不可為未來日期！');
+                    return false;
+                }
+                if (!checkDateOrder()) {
+                    return false;
+                }
+            }
+            // 賣出價格式校驗
+            if (sellPrice && sellPrice !== '' && (!regs.price.test(sellPrice) || sellPrice.length > 8)) {
+                document.getElementById('sellPrice').classList.add('invalid-input');
+                showErrorTip('【賣出價】為數字，精確3位小數且總長≤8！');
+                return false;
+            }
+            return true;
+        }
+        /************************** 本地存儲相關 **************************/
+        function getRecords() {
+            try {
+                const str = localStorage.getItem(window.STORAGE_KEY);
+                return str ? JSON.parse(str) : [];
+            } catch (e) {
+                showErrorTip('本地存儲讀取失敗，請清空瀏覽器緩存！');
+                return [];
+            }
+        }
+        function saveRecord(record) {
+            try {
+                const records = getRecords();
+                if (record.id) {
+                    const idx = records.findIndex(r => r.id === record.id);
+                    if (idx > -1) records[idx] = record;
+                } else {
+                    record.id = new Date().getTime().toString();
+                    records.push(record);
+                }
+                localStorage.setItem(window.STORAGE_KEY, JSON.stringify(records));
+            } catch (e) {
+                showErrorTip('本地存儲保存失敗，請檢查瀏覽器權限！');
+            }
+        }
+        /************************** 記錄操作 **************************/
+ function deleteRecord(id) {
+    if (confirm('確認刪除此條交易記錄？')) {
+        const records = getRecords().filter(r => r.id !== id);
+        localStorage.setItem(window.STORAGE_KEY, JSON.stringify(records));
+        renderAllRecords();
+        showErrorTip('記錄刪除成功！');
+    }
+}
+function copyRecord(id) {
+    const records = getRecords();
+    const record = records.find(r => r.id === id);
+    if (!record) return;
+    const newRecord = {
+        ...record,
+        id: new Date().getTime().toString()
+    };
+    records.push(newRecord);
+    localStorage.setItem(window.STORAGE_KEY, JSON.stringify(records));
+    renderAllRecords();
+    showErrorTip('記錄複製成功！');
+}
+function clearAllRecords() {
+    const num1 = Math.floor(Math.random() * 20) + 1;
+    const num2 = Math.floor(Math.random() * 20) + 1;
+    const op = ['+', '-'][Math.floor(Math.random() * 2)];
+    const answer = op === '+' ? num1 + num2 : num1 - num2;
+    const inputAns = prompt(`確認清空操作（清空後不可復原！），請輸入答案：${num1} ${op} ${num2} = ?`);
+    if (inputAns === null) return;
+    if (parseInt(inputAns) === answer) {
+        localStorage.removeItem(window.STORAGE_KEY);
+        renderAllRecords();
+        showErrorTip('所有記錄已清空！');
+    } else {
+        showErrorTip('算式錯誤，取消清空！');
+    }
+}
+/************************** 盈虧計算 **************************/
+function calcProfitLoss(record) {
+    const buy = parseFloat(record.buyPrice) || 0;
+    const sell = parseFloat(record.sellPrice) || 0;
+    const qty = parseInt(record.quantity) || 0;
+    const totalCost = buy * qty;
+    let profitLoss = 0, profitLossRate = 0, isTrade = false;
+    if (sell > 0 && totalCost > 0) {
+        profitLoss = (sell - buy) * qty;
+        profitLossRate = (profitLoss / totalCost) * 100;
+        isTrade = true;
+    }
+    return {
+        profitLoss: profitLoss.toFixed(2),
+        profitLossRate: profitLossRate.toFixed(2),
+        isTrade,
+        className: profitLoss > 0 ? 'profit' : profitLoss < 0 ? 'loss' : 'neutral'
+    };
+}
+function calcStats(records) {
+    const total = { profit: 0, rate: 0, totalCost: 0, tradeCount: 0 };
+    const monthMap = new Map();
+    const sorted = [...records].sort((a, b) => {
+        if (!a.sellDate) return 1;
+        if (!b.sellDate) return -1;
+        const aYmd = a.sellDate.slice(4) + a.sellDate.slice(2,4) + a.sellDate.slice(0,2);
+        const bYmd = b.sellDate.slice(4) + b.sellDate.slice(2,4) + b.sellDate.slice(0,2);
+        return bYmd.localeCompare(aYmd);
+    });
+    sorted.forEach(record => {
+        const { profitLoss, profitLossRate, isTrade } = calcProfitLoss(record);
+        const plNum = parseFloat(profitLoss);
+        const cost = parseFloat(record.buyPrice) * parseInt(record.quantity);
+        const dateGroup = record.sellDate || record.buyDate;
+        const month = formatDateToMonth(dateGroup);
+        if (!monthMap.has(month)) monthMap.set(month, { profit: 0, rate: 0, totalCost: 0, tradeCount: 0, records: [] });
+        const monthData = monthMap.get(month);
+        monthData.records.push(record);
+        // 延續：有賣出價即計入統計
+        if (isTrade) {
+            monthData.profit += plNum;
+            monthData.totalCost += cost;
+            monthData.tradeCount += 1;
+            total.profit += plNum;
+            total.totalCost += cost;
+            total.tradeCount += 1;
+        }
+    });
+    // 計算盈虧比例
+    total.rate = total.totalCost === 0 ? 0 : (total.profit / total.totalCost) * 100;
+    // 計算每月盈虧比例
+    monthMap.forEach(data => {
+        data.rate = data.totalCost === 0 ? 0 : (data.profit / data.totalCost) * 100;
+    });
+    return { total, monthMap, sorted };
+}
+function formatDateToMonth(dateStr) {
+    if (!dateStr || dateStr.length !== 8) return '未分組';
+    const yyyy = dateStr.slice(4,8);
+    const mm = dateStr.slice(2,4);
+    //return `${yyyy}年${mm}月`;
+	const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+	return `${monthNames[parseInt(mm)-1]}-${yyyy}`;
+}
+// 轉換 ddmmyyyy 為對應格式：與分組年份相同→dd-Mmm（如 05022026 → 05-Feb），不同→dd-Mmm-yyyy
+function formatDateToShort(dateStr, groupYear) { // 新增 groupYear 參數：當前分組的年份
+  // 校驗輸入格式：必須是8位數字（ddmmyyyy）
+  if (!/^\d{8}$/.test(dateStr)) {
+    return dateStr; // 格式不對則返回原始值，避免顯示異常
+  }
+  // 拆分日、月、年（ddmmyyyy → 前2位=日，中間2位=月，後4位=年）
+  const day = dateStr.substring(0, 2);
+  const month = dateStr.substring(2, 4); // 月份是數字（01-12）  
+  const dateYear = dateStr.substring(4, 8); // 買入日期的年份（4位）
+  // 英文月份縮寫數組（索引0對應空，1對應Jan，以此類推）
+  const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  // 轉換月份數字為英文縮寫（如 02 → Feb）
+  const monthAbbr = monthNames[parseInt(month, 10)] || month;  
+  // 判斷：買入日期年份與分組年份是否相同，返回對應格式
+  return dateYear === groupYear ? `${day}-${monthAbbr}` : `${day}-${monthAbbr}-${dateYear}`;
+}
+/************************** 25. 顯示總盈虧統計 | 延續：有賣出價即計算 + 交易筆數 **************************/
+function renderTotalStat(total) {
+    const statDiv = document.getElementById('totalStatResult');
+    if (!statDiv) return;
+    if (total.totalCost === 0) {
+        statDiv.className = 'neutral';
+        statDiv.innerHTML = '暫無已賣出交易記錄';
+        return;
+    }
+    const profit = total.profit.toFixed(2);
+    const rate = total.rate.toFixed(2);
+    const cls = profit > 0 ? 'profit' : profit < 0 ? 'loss' : 'neutral';
+    statDiv.className = cls;
+    statDiv.innerHTML = `
+        總盈虧：${profit} 元 | 盈虧比例：${rate}% | 總投入成本：${total.totalCost.toFixed(2)} 元 | 交易筆數：${total.tradeCount} 筆
+    `;
+}
+/************************** 26. 顯示交易記錄表格 | 持倉中標示僅在賣出日期列顯示 + 每月交易筆數 **************************/
+function renderRecordTable(monthMap) {
+  const contentDiv = document.getElementById('recordContent');
+  if (!contentDiv) return;
+  if (monthMap.size === 0) {
+    contentDiv.innerHTML = '<div class="empty-tip">請添加首條交易記錄</div>';
+    return;
+  }
+  let html = ''; 
+  // 將月份轉為可排序的yyyy-mm格式，再倒序遍歷：按月顯示
+  Array.from(monthMap.entries()).sort((a, b) => {
+    // 解析Mmm-yyyy為yyyy-mm
+    const parseMonth = (m) => {
+      const [mon, yyyy] = m.split('-');
+      const monMap = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+      return `${yyyy}-${monMap[mon]}`;
+    };
+    return parseMonth(b[0]).localeCompare(parseMonth(a[0]));
+  }).forEach(([month, data]) => {
+    const monthProfit = data.profit.toFixed(2);
+    const monthRate = data.rate.toFixed(2);
+    const monthCls = monthProfit > 0 ? 'profit' : monthProfit < 0 ? 'loss' : 'neutral';
+    // 提取當前分組的年份（從分組名稱 Mmm-yyyy 中拆分，如 Feb-2026 → 2026）
+    const groupYear = month.split('-')[1]; // 核心：獲取分組年份
+    html += `
+      <div class="month-section">
+        <div class="month-title">
+          ${month} 
+          <span class="${monthCls}">
+            月盈虧：${monthProfit} 元 | 盈虧比例：${monthRate}% | 交易筆數：${data.tradeCount} 筆
+          </span>
+        </div>
+        <table class="record-table">
+          <thead>
+            <tr>
+              <th>買入日期</th>
+              <th>股票號碼</th>
+              <th>股票名稱</th>
+              <th>數量</th>
+              <th>買入價</th>
+              <th>賣出日期</th>
+              <th>賣出價</th>
+              <th class="profit-loss-col">盈虧金額</th>
+              <th class="profit-loss-col">比例</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    // 顯示每條記錄
+    data.records.forEach(record => {
+      const { profitLoss, profitLossRate, className } = calcProfitLoss(record);
+      // 僅在賣出日期列標註「持倉中」（未輸入賣出日期時）
+      const sellDateHtml = !record.sellDate 
+        ? '<span style="color: #0567a3; font-weight: bold;">持倉中</span>' 
+        : formatDateToShort(record.sellDate, groupYear); // 賣出日期也可同步此規則（可選）
+      html += `
+        <tr>
+          <!-- 核心修改：傳遞分組年份 groupYear 給 formatDateToShort -->
+          <td>${formatDateToShort(record.buyDate, groupYear)}</td>
+          <td>${record.stockCode}</td>
+          <td>${record.stockName}</td>
+          <td>${record.quantity}</td>
+          <td>${record.buyPrice}</td>
+          <td>${sellDateHtml}</td>
+          <td>${record.sellPrice || '-'}</td>
+          <td class="${className}">${profitLoss}</td>
+          <td class="${className}">${profitLossRate}%</td>
+          <td>
+            <button class="op-btn" style="background: #0293ed;" onclick="editRecord('${record.id}')">修改</button>
+            <button class="op-btn" style="background: #a706a2;" onclick="deleteRecord('${record.id}')">刪除</button>
+            <button class="op-btn" style="background: #06a73f;" onclick="copyRecord('${record.id}')">複製</button>
+          </td>
+        </tr>
+      `;
+    });
+    html += `
+          </tbody>
+        </table>
+      </div>
+    `;
+  });
+  contentDiv.innerHTML = html;
+}
+/************************** 27. 顯示所有記錄 **************************/
+function renderAllRecords() {
+    const records = getRecords();
+    const { total, monthMap } = calcStats(records);
+    renderTotalStat(total);
+    renderRecordTable(monthMap);
+}
+/************************** 28. 保存當前記錄 | 賣出價強關聯賣出日期 **************************/
+function saveCurrentRecord() {
+    // 強制移除所有輸入框錯誤樣式，根絕殘留誤提示
+    document.querySelectorAll('input').forEach(input => {
+        if (input) input.classList.remove('invalid-input');
+    });
+    if (!validateForm()) return;
+    
+    // 明確區分新增/修改狀態（優先判斷是否為編輯模式）
+    const editId = document.getElementById('editId').value.trim();
+    const isEditMode = !!editId; // 強制轉為布爾值，避免空字符串/空格誤判
+    
+    const record = {
+        id: isEditMode ? editId : '', // 編輯模式保留原ID，新增模式強制為空
+        buyDate: document.getElementById('buyDate').value.trim(),
+        stockCode: document.getElementById('stockCode').value.trim(),
+        stockName: document.getElementById('stockName').value.trim(),
+        quantity: document.getElementById('quantity').value.trim(),
+        buyPrice: document.getElementById('buyPrice').value.trim(),
+        sellDate: document.getElementById('sellDate').value.trim(),
+        sellPrice: document.getElementById('sellPrice').value.trim()
+    };
+    saveRecord(record);
+    
+    // 重置表單（重點：確保editId徹底清空，避免殘留）
+    document.getElementById('editId').value = ''; // 強制清空，不依賴默認值
+    setTodayDate();
+    document.getElementById('stockCode').value = '';
+    document.getElementById('stockName').value = '';
+    document.getElementById('quantity').value = '';
+    document.getElementById('buyPrice').value = '';
+    document.getElementById('sellPrice').value = '';
+    
+    // 重新顯示記錄
+    renderAllRecords();
+    // 顯示成功提示（基於明確的模式判斷）
+    showErrorTip(isEditMode ? '記錄修改成功！' : '記錄新增成功！');
+}
+/************************** 29. 修改記錄 **************************/
+function editRecord(id) {
+    const records = getRecords();
+    const record = records.find(r => r.id === id);
+    if (!record) return;
+    
+    // 回填表單數據（明確賦值，避免隱式轉換）
+    document.getElementById('editId').value = record.id || ''; // 確保ID正確賦值，非空
+    document.getElementById('buyDate').value = record.buyDate || '';
+    document.getElementById('stockCode').value = record.stockCode || '';
+    document.getElementById('stockName').value = record.stockName || '';
+    document.getElementById('quantity').value = record.quantity || '';
+    document.getElementById('buyPrice').value = record.buyPrice || '';
+    document.getElementById('sellDate').value = record.sellDate || '';
+    document.getElementById('sellPrice').value = record.sellPrice || '';
+    
+    // 滾動到表單頂部
+    document.getElementById('inputDiv').scrollIntoView({ behavior: 'smooth' });
+}
+/************************** 30. 導出記錄為JSON文件 **************************/
+function exportRecords() {
+    const records = getRecords();
+    if (records.length === 0) {
+        showErrorTip('當前無交易記錄可導出！');
+        return;
+    }
+    // 生成JSON文件
+    const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `股票交易記錄_${new Date().getTime()}.json`;
+    a.click();
+    // 釋放URL對象
+    URL.revokeObjectURL(a.href);
+    showErrorTip('記錄導出成功！');
+}
+/************************** 31. 導入JSON記錄文件 **************************/
+function handleFileImport(fileInput) {
+    const file = fileInput.files[0];
+    if (!file) return;
+    // 驗證文件格式
+    if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+        showErrorTip('僅支持導入JSON格式文件！');
+        fileInput.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const imported = JSON.parse(e.target.result);
+            if (!Array.isArray(imported)) throw new Error('文件格式錯誤，必須為數組');
+            const existing = getRecords();
+            // 合併記錄（ID相同則覆蓋，避免重複）
+            const merged = [...existing];
+            imported.forEach(imp => {
+                if (imp.id) {
+                    const idx = merged.findIndex(r => r.id === imp.id);
+                    if (idx > -1) merged[idx] = imp;
+                    else merged.push(imp);
+                } else {
+                    // 為無ID的導入記錄生成唯一ID
+                    imp.id = new Date().getTime().toString();
+                    merged.push(imp);
+                }
+            });
+            // 保存合併後的記錄
+            localStorage.setItem(window.STORAGE_KEY, JSON.stringify(merged));
+            renderAllRecords();
+            showErrorTip(`成功導入 ${imported.length} 條記錄！`);
+        } catch (e) {
+            showErrorTip(`文件解析失敗：${e.message}`);
+        } finally {
+            // 清空文件輸入框
+            fileInput.value = '';
+        }
+    };
+    reader.readAsText(file);
+}
+/************************** 32. 綁定所有事件（備用） | 移除重複綁定，解決多次觸發 **************************/
+function bindEvents() {
+    // 保存按鈕單綁定，避免onclick+addEventListener重複觸發
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) saveBtn.addEventListener('click', saveCurrentRecord);
+ 
+    // 賣出日期填寫後，移除自身錯誤樣式
+    const sellDate = document.getElementById('sellDate');
+    if (sellDate) {
+        sellDate.addEventListener('input', function() {
+            if (this.value.trim()) this.classList.remove('invalid-input');
+        });
+    }
+}
+/************************** 新增：截圖功能（修復版，可正常使用） **************************/
+function takeScreenshot() {
+    const screenshotTarget = document.getElementById('outerWrapper');
+    if (!screenshotTarget) {
+        showErrorTip('截圖目標元素不存在！');
+        return;
+    }
+    // 解決截圖空白/失敗問題：設置useCORS+allowTaint
+    html2canvas(screenshotTarget, {
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        scale: window.devicePixelRatio || 1
+    }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `股票交易記錄截圖_${new Date().getTime()}.png`;
+        link.href = canvas.toDataURL('image/png', 1.0);
+        link.click();
+        // 釋放資源
+        URL.revokeObjectURL(link.href);
+        showErrorTip('截圖已成功下載！');
+    }).catch(err => {
+        console.error('截圖失敗原因：', err);
+        showErrorTip('截圖失敗，請檢查瀏覽器權限或重試！');
+    });
+}
+
+	// 從預設的顔色列表隨機挑選1個顔色
+function getRandomColor()
+{	let colorlist = ['#71CDE7','#6289DD','#513B57','#586982','#B14131','#6449C0','#3FB3FB','#44712F','#8B9471','#228CAC','#7DA43F','#136305','#5F1A70','#2C46B5','#9F4256','#686B66','#3B321C','#01364F','#93A609','#13A895','#09443B','#5E060D','#5E9F48','#6F67BD','#9E7DD4','#4FB24F','#AF925D','#55903E','#7E7390','#08AED6','#C1A7AD','#5EB809','#4EC0B8','#B55A7A','#194150','#050522','#5E53CA','#C94F77','#524069','#A86A56','#7BAEB7','#859CC4','#0950B4','#2C6139','#817D31','#CDBA32','#466429','#30660E','#3881C9','#808B42','#745E77','#02841C','#15905D','#357749','#4D8695','#AF7849','#CD83B9','#52A22B','#7469CF','#59549C','#878CD1','#7D8028','#209371','#A492AE','#603465','#822B36','#977F35','#8A5369','#7370B0','#6B5C97','#737C5A','#545434','#5B3414','#09968E','#505701','#706988','#C99062','#458B3A','#A59AAE','#66A5C1','#4C686E','#F1939E','#0A257E','#765170','#753D3C','#47B6D1','#9846E1','#515975','#A78AAC','#5D9DAA','#2E46D4','#DF9566','#905F84','#56A4F1','#4C567A','#641E64','#886B22','#B34E87','#134A98','#5F1424','#057742','#3B1E8C','#495568','#2A8381','#235089','#6D8B6C','#1D360E','#667ED9','#66155F','#769FA1','#57AEBC','#07B6BC','#8391BC','#A996F2','#213F82','#6B2781','#10B5EA','#B27FCE','#5B81AD','#E07E76','#472F21','#ADB5C6','#91761D','#3B889C','#B680F0','#EB82A3','#CF7608','#D77C82','#369C40','#886B5C','#4EA3B1','#BCAF68','#73A5BD','#8A5D4D','#55682D','#2EA7B0','#FF99CC','#FF9999','#FF9966','#FF9933','#FF9900','#FF66CC','#FF6699','#FF6666','#CC99FF','#CC99CC','#CC9999','#CC9966','#CC9933','#CC9900','#CC66FF','#CC66CC','#CC6699','#CC6666','#CC6633','#CC6600','#CC3366','#99CCCC','#99CC99','#99CC66','#9999FF','#9999CC','#999999','#999966','#999933','#999900','#9966FF','#9966CC','#996699','#996666','#996633','#996600','#9933FF','#9933CC','#993399','#993366','#993333','#993300','#66CCCC','#66CC99','#66CC66','#6699FF','#6699CC','#669999','#669966','#669933','#669900','#6666FF','#6666CC','#666699','#666666','#666633','#666600','#6633FF','#6633CC','#663399','#663366','#663333','#663300','#6600FF','#6600CC','#660099','#660066','#660033','#33CCCC','#33CC99','#33CC66','#3399FF','#3399CC','#339999','#339966','#339933','#339900','#3366FF','#3366CC','#336699','#336666','#336633','#336600','#3333FF','#3333CC','#333399','#333366','#333333','#333300','#3300CC','#330099','#330066','#330033','#330000','#0099CC','#009999','#009966','#0066FF','#0066CC','#006699','#006666','#006633','#006600','#0033FF','#0033CC','#003399','#003366','#003333','#003300','#0000CC','#000099','#000066','#000033','#000000','#CD5C5C','#F08080','#FA8072','#FF69B4','#C71585','#FF7F50','#DDA0DD','#EE82EE','#DA70D6','#BA55D3','#9370DB','#8A2BE2','#9932CC','#8B008B','#800080','#4B0082','#7B68EE','#6A5ACD','#483D8B','#3CB371','#2E8B57','#228B22','#6B8E23','#808000','#556B2F','#20B2AA','#008B8B','#5F9EA0','#4682B4','#87CEFA','#00BFFF','#1E90FF','#6495ED','#00008B','#191970','#D2B48C','#BC8F8F','#B8860B','#CD853F','#D2691E','#8B4513','#A0522D','#0079ad','#333e32','#081307','#732910','#784208','#5d6e08','#206e0b','#065c55','#062a63','#06127a','#210a78','#510d85','#941e92','#4f020a','#0B3706','#062C02','#0A1B08','#123F0E','#0E3E0A','#0B2209','#0C2A09','#0B2B08','#092206','#071F05','#0A2608','#132A48','#150909','#391414','#430B02','#250E0A','#220803','#180901','#622404','#4B2410','#4B2E10','#4D3108','#4D3D10','#403004','#47411C','#4F5106','#2E3607','#242F09','#2F5406','#21500A','#124B10','#0B5816','#105A26','#0F552B','#094D2F','#09392C','#0A433D','#044550','#0A4C68','#0A3668','#0A062B','#0A1768','#270B57','#390C50','#500C50','#29091D','#290911','#240505','#0066cc','#0099cc','#004c99','#331900','#003319','#193300','#001933','#190033','#040720','#0C090A','#34282C','#3B3131','#3A3B3C','#454545','#4D4D4F','#413839','#3D3C3A','#463E3F','#4C4646','#504A4B','#565051','#52595D','#5C5858','#625D5D','#666362','#696969','#686A6C','#6D6968','#726E6D','#736F6E','#757575','#797979','#837E7C','#808080','#848482','#8C8C8C','#8D918D','#9B9A96','#A8A9AD','#C9C0BB','#98AFC7','#838996','#778899','#708090','#6D7B8D','#657383','#616D7E','#646D7E','#71797E','#566D7E','#737CA1','#728FCE','#4863A0','#2F539B','#2B547E','#36454F','#29465B','#2B3856','#123456','#151B54','#151B8D','#15317E','#0000A5','#0020C2','#0041C2','#2916F5','#1F45FC','#2554C7','#1569C7','#1974D2','#2B60DE','#4169E1','#2B65EC','#0059FF','#306EFF','#157DEC','#1589FF','#368BC1','#488AC7','#357EC7','#3090C7','#14A3C7','#659EC7','#87AFC7','#6698FF','#56A5EC','#38ACEC','#3BB9FF','#5CB3FF','#79BAEC','#3EA99F','#3B9C9C','#00827F','#008080','#007C80','#045F5F','#045D5D','#033E3E','#25383C','#2C3539','#3C565B','#4C787E','#5E7D7E','#307D7E','#348781','#438D80','#4E8975','#1F6357','#306754','#006A4E','#1B8A6B','#31906E','#00A36C','#34A56F','#1AA260','#7C9D8E','#78866B','#848B79','#617C58','#4E5B31','#3A5F0B','#4B5320','#667C26','#4E9258','#387C44','#347235','#27742C','#347C2C','#227442','#006400','#056608','#046307','#355E3B','#254117','#004225','#026C3D','#437C17','#347C17','#8A9A5B','#3F9B0B','#4AA02C','#41A317','#3EA055','#73A16C','#C19A6B','#C8AD7F','#BCB88A','#C9AE5D','#B5A642','#D4A017','#C58917','#CA762B','#B87333','#966F33','#906E3E','#806517','#665D1E','#8E7618','#8B8000','#827839','#8A865D','#93917C','#9F8C76','#AF9B60','#827B60','#786D5F','#483C32','#4A412A','#473810','#493D26','#513B1C','#3D3635','#3B2F2F','#49413F','#43302E','#622F22','#5C3317','#644117','#654321','#704214','#804A00','#6F4E37','#835C3B','#7F5217','#7F462C','#8A4117','#7E3817','#7E3517','#954535','#9E4638','#A05544','#B5651D','#A55D35','#C36241','#CB6D51','#C47451','#E67451','#E78A61','#DA8A67','#E77471','#551606','#560319','#3F000F','#3D0C02','#2F0909','#2B1B17','#550A35','#810541','#7D0541','#7D0552','#872657','#7E354D','#7F4E52','#7F525D','#7F5A58','#997070','#B38481','#C48793','#CC7A8B','#C48189','#C08081','#D58A94','#E38AAE','#E5788F','#E56E94','#D16587','#C25A7C','#C25283','#B3446C','#B048B5','#A17188','#915F6D','#7E587E','#614051','#583759','#5E5A80','#4E5180','#6960EC','#7575CF','#6667AB','#5539CC','#5453A6','#4E387E','#571B7E','#36013F','#2E1A47','#461B7E','#342D7E','#6A287E','#7A5DC7','#7F38EC','#8467D7','#8686AF','#967BB6','#C38EC7','#0C4C05','#5604A7'];
+	let n = Math.floor(Math.random() * colorlist.length);
+	let c = colorlist[n];
+	colorlist = [];	//alert(colorlist.length);
+	return c;
+}
+function updateClock(divName) {
+	const now = new Date();
+	const hours = String(now.getHours()).padStart(2, '0');
+	const minutes = String(now.getMinutes()).padStart(2, '0');
+	const seconds = String(now.getSeconds()).padStart(2, '0');
+	const timeString = `${hours}:${minutes}:${seconds}`;
+	document.getElementById(divName).textContent = '⏰ ' + timeString;
+	document.getElementById('clockButton').style.backgroundColor = getRandomColor();
+}
+	// Pass the function reference to setInterval
+setInterval(() => updateClock('clock'), 1000);
+updateClock('clock'); // Initial call to display clock immediately
+</script>
+</body>
+</html>
